@@ -1,13 +1,13 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import * as AWS from 'aws-sdk'
+import { S3Client, GetObjectCommand, ListObjectsCommand } from '@aws-sdk/client-s3'
 import * as os from 'os'
 import * as fs from 'fs'
 import path from 'path'
 import {Inputs, Outputs} from './constants'
 
 function doDownload(
-  s3: AWS.S3,
+  s3: S3Client,
   s3Bucket: string,
   fileKey: string,
   writeStream: fs.WriteStream
@@ -15,11 +15,9 @@ function doDownload(
   return new Promise(function (resolve, reject) {
     const getObjectParams = {Bucket: s3Bucket, Key: fileKey}
     core.debug(`S3 download uri: s3://${s3Bucket}/${fileKey}`)
-    s3.getObject(getObjectParams)
-      .createReadStream()
-      .on('end', () => resolve())
-      .on('error', error => reject(error))
-      .pipe(writeStream)
+    s3.send(new GetObjectCommand(getObjectParams))
+      .then(() => resolve())
+      .catch(error => reject(error))
   })
 }
 
@@ -39,14 +37,14 @@ async function run(): Promise<void> {
       resolvedPath = path.resolve(chosenPath)
     }
     core.debug(`Resolved path is ${resolvedPath}`)
-    const s3 = new AWS.S3({region: region})
+    const s3 = new S3Client({region: region})
     const s3Prefix = `${github.context.repo.owner}/${github.context.repo.repo}/${github.context.runId}/${name}/`
     const s3Params = {
       Bucket: s3Bucket,
       Prefix: s3Prefix
     }
     core.debug(JSON.stringify(s3Params))
-    const objects = await s3.listObjects(s3Params).promise()
+    const objects = await s3.send(new ListObjectsCommand(s3Params))
     if (!objects.Contents) {
       throw new Error(`Could not find objects with ${s3Prefix}`)
     }
@@ -86,7 +84,11 @@ async function run(): Promise<void> {
     core.setOutput(Outputs.DownloadPath, resolvedPath)
     core.info('Artifact download has finished successfully')
   } catch (err) {
-    core.setFailed(err.message)
+    if (err instanceof Error) {
+      core.setFailed(err.message)
+    } else {
+      core.setFailed(`Unknown error: ${err}`)
+    }
   }
 }
 
