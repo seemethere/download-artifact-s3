@@ -30,8 +30,6 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@aws-sdk/client-dynamodb": "^3.799.0",
-    "@aws-sdk/client-lambda": "^3.799.0",
     "@aws-sdk/client-s3": "^3.799.0"
   },
   "devDependencies": {
