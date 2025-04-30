@@ -1,6 +1,10 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { S3Client, GetObjectCommand, ListObjectsCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  GetObjectCommand,
+  ListObjectsCommand
+} from '@aws-sdk/client-s3'
 import * as os from 'os'
 import * as fs from 'fs'
 import path from 'path'
@@ -16,7 +20,16 @@ function doDownload(
     const getObjectParams = {Bucket: s3Bucket, Key: fileKey}
     core.debug(`S3 download uri: s3://${s3Bucket}/${fileKey}`)
     s3.send(new GetObjectCommand(getObjectParams))
-      .then(() => resolve())
+      .then(async response => {
+        if (!response.Body) {
+          reject(new Error('No body in response'))
+          return
+        }
+        const bodyContents = await response.Body.transformToByteArray()
+        writeStream.write(Buffer.from(bodyContents))
+        writeStream.end()
+        resolve()
+      })
       .catch(error => reject(error))
   })
 }
